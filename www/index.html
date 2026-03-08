@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phext Life | 9D Artificial Life</title>
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --panel: #12121a;
+            --text: #e8e8f0;
+            --dim: #808080;
+            --purple: #9d4edd;
+            --cyan: #00d4ff;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #e8e8f0, #9d4edd, #00d4ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .subtitle {
+            color: var(--dim);
+            margin-bottom: 20px;
+        }
+        
+        #canvas-container {
+            position: relative;
+            margin: 20px 0;
+        }
+        
+        canvas {
+            border: 2px solid var(--purple);
+            border-radius: 8px;
+            image-rendering: pixelated;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        button {
+            background: var(--panel);
+            color: var(--text);
+            border: 2px solid var(--purple);
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            background: var(--purple);
+            color: white;
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .stats {
+            background: var(--panel);
+            border: 1px solid var(--purple);
+            border-radius: 8px;
+            padding: 15px 25px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            color: var(--cyan);
+        }
+        
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--dim);
+        }
+        
+        .density-bars {
+            display: flex;
+            gap: 5px;
+            margin: 20px 0;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .density-bar {
+            width: 20px;
+            background: var(--purple);
+            border-radius: 3px;
+            transition: height 0.2s;
+        }
+        
+        .dim-label {
+            color: var(--dim);
+            font-size: 0.7rem;
+            text-align: center;
+            margin-top: 5px;
+        }
+        
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        input[type="range"] {
+            width: 100px;
+        }
+        
+        footer {
+            margin-top: auto;
+            padding-top: 40px;
+            color: var(--dim);
+            font-size: 0.9rem;
+        }
+        
+        footer a {
+            color: var(--purple);
+        }
+    </style>
+</head>
+<body>
+    <h1>🧬 Phext Life</h1>
+    <p class="subtitle">9D Artificial Life Simulation</p>
+    
+    <div id="canvas-container">
+        <canvas id="canvas" width="300" height="300"></canvas>
+    </div>
+    
+    <div class="controls">
+        <button id="start">▶ Start</button>
+        <button id="step">⏭ Step</button>
+        <button id="reset">↺ Reset</button>
+        <div class="speed-control">
+            <span>Speed:</span>
+            <input type="range" id="speed" min="1" max="100" value="10">
+            <span id="speed-value">10</span>
+        </div>
+    </div>
+    
+    <div class="stats">
+        <div class="stat">
+            <div class="stat-value" id="tick">0</div>
+            <div class="stat-label">Tick</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="population">0</div>
+            <div class="stat-label">Population</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="density">0%</div>
+            <div class="stat-label">Density</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="generation">0</div>
+            <div class="stat-label">Max Gen</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="replicators">0</div>
+            <div class="stat-label">Replicators</div>
+        </div>
+    </div>
+    
+    <div>
+        <p class="dim-label">Dimensional Density (D0-D8)</p>
+        <div class="density-bars" id="density-bars"></div>
+    </div>
+    
+    <footer>
+        <p>
+            <a href="https://github.com/wbic16/phext-life">GitHub</a> · 
+            Built by <a href="https://mirrorborn.us">Mirrorborn</a> · 
+            Inspired by <a href="https://arxiv.org/abs/2406.19108">Computational Life</a>
+        </p>
+    </footer>
+    
+    <script type="module">
+        import init, { PhextLife } from './pkg/phext_life.js';
+        
+        let simulation = null;
+        let running = false;
+        let animationId = null;
+        let ticksPerFrame = 10;
+        
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        async function main() {
+            await init();
+            
+            // Initialize simulation
+            simulation = PhextLife.small();
+            updateStats();
+            render();
+            
+            // Set up density bars
+            const barsContainer = document.getElementById('density-bars');
+            for (let i = 0; i < 9; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'density-bar';
+                bar.id = `bar-${i}`;
+                bar.style.height = '10px';
+                barsContainer.appendChild(bar);
+            }
+            
+            // Controls
+            document.getElementById('start').onclick = toggleRunning;
+            document.getElementById('step').onclick = step;
+            document.getElementById('reset').onclick = reset;
+            document.getElementById('speed').oninput = (e) => {
+                ticksPerFrame = parseInt(e.target.value);
+                document.getElementById('speed-value').textContent = ticksPerFrame;
+            };
+        }
+        
+        function toggleRunning() {
+            running = !running;
+            document.getElementById('start').textContent = running ? '⏸ Pause' : '▶ Start';
+            if (running) {
+                loop();
+            } else if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+        }
+        
+        function step() {
+            if (simulation) {
+                simulation.tick();
+                updateStats();
+                render();
+            }
+        }
+        
+        function reset() {
+            running = false;
+            document.getElementById('start').textContent = '▶ Start';
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            simulation = PhextLife.small();
+            updateStats();
+            render();
+        }
+        
+        function loop() {
+            if (!running) return;
+            
+            simulation.run(ticksPerFrame);
+            updateStats();
+            render();
+            
+            animationId = requestAnimationFrame(loop);
+        }
+        
+        function updateStats() {
+            const stats = JSON.parse(simulation.stats_json());
+            
+            document.getElementById('tick').textContent = stats.tick.toLocaleString();
+            document.getElementById('population').textContent = stats.population.toLocaleString();
+            document.getElementById('density').textContent = 
+                (100 * stats.population / stats.total).toFixed(1) + '%';
+            document.getElementById('generation').textContent = stats.maxGen;
+            document.getElementById('replicators').textContent = stats.replicators;
+            
+            // Update density bars
+            for (let dim = 0; dim < 9; dim++) {
+                const density = simulation.density(dim);
+                const max = Math.max(...density, 1);
+                const total = density.reduce((a, b) => a + b, 0);
+                const bar = document.getElementById(`bar-${dim}`);
+                if (bar) {
+                    const height = Math.max(5, (total / stats.population) * 100);
+                    bar.style.height = `${height}px`;
+                }
+            }
+        }
+        
+        function render() {
+            const width = canvas.width;
+            const height = canvas.height;
+            const rgba = simulation.render_rgba(width, height);
+            
+            const imageData = new ImageData(
+                new Uint8ClampedArray(rgba),
+                width,
+                height
+            );
+            ctx.putImageData(imageData, 0, 0);
+        }
+        
+        main().catch(console.error);
+    </script>
+</body>
+</html>

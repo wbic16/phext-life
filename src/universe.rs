@@ -17,7 +17,7 @@ impl Universe {
     /// Create universe with given extents, randomly populated
     pub fn new(extents: [u8; 9], fill_ratio: f64) -> Self {
         let mut programs = HashMap::new();
-        let mut rng = rand::thread_rng();
+        let _rng = rand::thread_rng();
 
         // Calculate total coordinates
         let total: usize = extents.iter().map(|&e| e as usize).product();

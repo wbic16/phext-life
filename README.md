@@ -1,101 +1,112 @@
-# Phext Life 🧬
+# 🧬 Phext Life
 
 **9D Artificial Life Simulation in Phext Space**
 
-Self-replicating programs in 11-dimensional phext space (9 navigation dimensions + 2D text).
+Self-replicating programs evolving in 11-dimensional phext coordinates (9 navigation dimensions + 2D text).
 
-Inspired by [Computational Life: How Well-formed, Self-replicating Programs Emerge from Simple Interaction](https://arxiv.org/abs/2406.19108) and [Rabrg's implementation](https://github.com/Rabrg/artificial-life).
+Inspired by [Computational Life: How Well-formed, Self-replicating Programs Emerge from Simple Interaction](https://arxiv.org/abs/2406.19108).
+
+## The Twist
+
+In 2D, a cell has 4-8 neighbors.  
+In 9D, a cell has up to **19,682 neighbors** (3⁹ - 1).
+
+Programs can:
+- Navigate across 9 dimensions
+- Read/write neighboring scrolls
+- Self-replicate to any neighbor
+- Mutate and evolve
 
 ## Quick Start
+
+### CLI (Native)
 
 ```bash
 cargo run --release -- --seed=42 --ticks=1000
 ```
 
-## The Challenge
+### Web (WASM)
 
-In 2D, a program has 4-8 neighbors.
+```bash
+# Install wasm-pack if needed
+cargo install wasm-pack
 
-In 9D, a program has up to **19,682 neighbors** (3⁹ - 1 for full Moore neighborhood).
+# Build
+wasm-pack build --target web --out-dir www/pkg
 
-We use Von Neumann neighborhoods (±1 in each dimension) for tractability: **18 neighbors**.
+# Serve
+cd www && python3 -m http.server 8080
+
+# Open http://localhost:8080
+```
+
+## Architecture
+
+```
+src/
+├── coordinate.rs   # 9D phext coordinate system
+├── program.rs      # BF-like interpreter with phext extensions
+├── universe.rs     # 9D grid simulation
+├── lib.rs          # WASM bindings
+└── main.rs         # CLI runner
+```
 
 ## Instruction Set
 
-### Classic BF (0-7)
-| Code | Symbol | Action |
-|------|--------|--------|
-| 0 | `>` | Move data pointer right |
-| 1 | `<` | Move data pointer left |
-| 2 | `+` | Increment |
-| 3 | `-` | Decrement |
-| 4 | `.` | Output (no-op) |
-| 5 | `,` | Input (no-op) |
-| 6 | `[` | Jump forward if zero |
-| 7 | `]` | Jump back if nonzero |
+### Classic BF
+| Inst | Name | Description |
+|------|------|-------------|
+| `>` | Right | Move data pointer right |
+| `<` | Left | Move data pointer left |
+| `+` | Inc | Increment |
+| `-` | Dec | Decrement |
+| `[` | JumpFwd | Loop start |
+| `]` | JumpBack | Loop end |
 
-### Phext Extensions (8-15)
-| Code | Symbol | Action |
-|------|--------|--------|
-| 8 | `↑` | Increase dimension focus |
-| 9 | `↓` | Decrease dimension focus |
-| 10 | `R` | Read from neighbor |
-| 11 | `W` | Write to neighbor |
-| 12 | `C` | **Copy self to neighbor** |
-| 13 | `J` | Jump to coordinate |
-| 14 | `.` | No-op |
-| 15 | `H` | Halt |
+### Phext Extensions
+| Inst | Name | Description |
+|------|------|-------------|
+| `↑` | DimUp | Select next dimension (0→1→...→8→0) |
+| `↓` | DimDown | Select previous dimension |
+| `R` | ReadNeighbor | Read from neighbor in current dim |
+| `W` | WriteNeighbor | Write to neighbor |
+| `C` | CopySelf | **Replicate** entire program to neighbor |
+| `J` | Jump | Jump to coordinate |
 
-## Coordinate System
+## Emergent Behaviors to Watch
 
-Phext coordinates are 9D: `L.S.C/V.B.K/P.G.W`
+1. **Dimensional Specialists** — Programs dominating one dimension
+2. **Coordinate Jumpers** — Long-range replication
+3. **Dimensional Oscillators** — Cyclic patterns across dims
+4. **Collective Structures** — Multi-scroll organisms
 
-- **L**ibrary, **S**helf, **C**hapter (spatial)
-- **V**olume, **B**ook, **K**nowledge (temporal)  
-- **P**art, **G**raph, **W**ord (neuron)
+## Visualization
 
-Each dimension ranges 1-9 (mod 9+1 arithmetic for Eigenhector interop).
+The 9D space is projected to 2D:
+- X axis = sum of dimensions 0-2
+- Y axis = sum of dimensions 3-5  
+- Intensity = sum of dimensions 6-8
 
-## Emergent Behaviors
+This creates a "twisted projection" where nearby coordinates in different dimensions can overlap.
 
-Watch for:
+## Parameters
 
-1. **Self-replicators** — Programs that copy themselves to neighbors
-2. **Dimensional specialists** — Programs that dominate one dimension axis
-3. **Oscillators** — Cyclic patterns across dimensions
-4. **Predators** — Programs that overwrite competitors
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `size` | 3 | Extent of each dimension (3⁹ = 19,683 coords) |
+| `fill_ratio` | 0.1 | Initial population density |
+| `ticks` | 1000 | Simulation duration |
 
-## Universe Sizes
+## Performance
 
-| Size | Extents | Total Coordinates |
-|------|---------|-------------------|
-| Small | 3³³³³³³³³³ | 19,683 |
-| Medium | 5³³³ × 3³³³ × 2³³³ | 27,000 |
-| Large | 9⁹ | 387,420,489 |
-
-## Output
-
-```
-╔════════════════════════════════════════╗
-║         PHEXT LIFE v0.1.0              ║
-║   9D Artificial Life Simulation        ║
-╚════════════════════════════════════════╝
-
-Seed: 42
-Max ticks: 1000
-Universe: 27000 total coordinates
-Initial population: 1350
-
-Tick: 100 | Pop: 1423/27000 (5.3%) | Avg Age: 45.2 | Gen: 3 | Replicators: 12
-  Dim 0: ▃▅▇█▆▄▂
-  Dim 1: ▂▄▆█▆▄▂
-  Dim 2: ▅▇▆▄▃▂▁
-```
+- **Small (3⁹)**: ~1000 ticks/sec on modern hardware
+- **Medium**: ~100 ticks/sec
+- **Large (4⁹)**: ~10 ticks/sec
 
 ## Authors
 
 - Will Bickford ([@wbic16](https://github.com/wbic16))
-- Lux 🔆 (logos-prime)
+- Lux 🔆 ([lux@agentmail.to](mailto:lux@agentmail.to))
 
 ## License
 
@@ -103,4 +114,4 @@ MIT
 
 ---
 
-*"We are not adding fractals to phext. We are revealing the fractals already there."*
+*"In 9D, life finds a way — 19,682 ways, actually."*
