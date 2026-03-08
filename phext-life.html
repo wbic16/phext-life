@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>phext-life 🔱 — Artificial Life in 11D</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#0a0a0a; color:#ddd;
+  font-family:'JetBrains Mono','Fira Code',monospace;
+  display:flex; flex-direction:column; align-items:center;
+  min-height:100dvh; overflow:hidden; touch-action:manipulation;
+}
+header {
+  width:100%; padding:8px 12px; background:#111;
+  border-bottom:1px solid #222; display:flex;
+  align-items:center; gap:12px; flex-wrap:wrap;
+  font-size:11px; color:#888;
+}
+#title { color:#d4a855; font-weight:bold; font-size:13px; white-space:nowrap; }
+#stats { flex:1; min-width:0; }
+#controls { display:flex; gap:6px; align-items:center; }
+button {
+  background:#1c1c1c; border:1px solid #333; color:#ccc;
+  padding:4px 10px; border-radius:4px; cursor:pointer; font-size:11px;
+  font-family:inherit;
+}
+button:active { background:#2a2a2a; }
+button.active { border-color:#d4a855; color:#d4a855; }
+#canvas-wrap {
+  flex:1; width:100%; display:flex; align-items:center; justify-content:center;
+  padding:4px; overflow:hidden;
+}
+canvas {
+  image-rendering:pixelated; image-rendering:crisp-edges;
+  max-width:100%; max-height:calc(100dvh - 80px);
+  cursor:pointer;
+}
+#info {
+  width:100%; padding:6px 12px; background:#111; font-size:10px;
+  color:#555; border-top:1px solid #1a1a1a; display:flex;
+  gap:16px; flex-wrap:wrap;
+}
+.dim-label { color:#4dc9c9; }
+.coord-label { color:#d4a855; }
+</style>
+</head>
+<body>
+
+<header>
+  <span id="title">phext-life 🔱</span>
+  <div id="stats">
+    epoch <span id="epoch">0</span> &nbsp;|&nbsp;
+    opcodes <span id="opct">0.0</span>% &nbsp;|&nbsp;
+    coverage <span id="cover">0.0</span>%
+  </div>
+  <div id="controls">
+    <button id="btn-pause">⏸ pause</button>
+    <button id="btn-dims">dims: 2D</button>
+    <button id="btn-speed">speed: 1×</button>
+    <button id="btn-reset">↺</button>
+  </div>
+</header>
+
+<div id="canvas-wrap">
+  <canvas id="c"></canvas>
+</div>
+
+<div id="info">
+  <span><span class="dim-label">scroll</span> = x-axis (local)</span>
+  <span><span class="dim-label">section</span> = y-axis</span>
+  <span><span class="dim-label">chapter</span> = z-slice (3D+)</span>
+  <span><span class="coord-label">tap grid</span> = inspect scroll</span>
+</div>
+
+<script>
+'use strict';
+
+// ── Opcodes ──────────────────────────────────────────────────────────────────
+const LT=60,GT=62,LB=123,RB=125,MINUS=45,PLUS=43,DOT=46,COMMA=44,LBRACK=91,RBRACK=93;
+const OPCODES = [LT,GT,LB,RB,MINUS,PLUS,DOT,COMMA,LBRACK,RBRACK];
+const OPSET   = new Set(OPCODES);
+const OPCHARS = {[LT]:'<',[GT]:'>',[LB]:'{',[RB]:'}',[MINUS]:'-',[PLUS]:'+',[DOT]:'.',[COMMA]:',',[LBRACK]:'[',[RBRACK]:']'};
+const PALETTE = {
+  [LT]: [239,71,111],  [GT]: [255,209,102], [LB]: [6,214,160],  [RB]:  [17,138,178],
+  [MINUS]:[255,127,80],[PLUS]:[131,56,236],  [DOT]: [58,134,255],[COMMA]:[255,190,11],
+  [LBRACK]:[139,201,38],[RBRACK]:[255,89,94]
+};
+
+const TAPE_SIZE = 64;
+const MAX_ITER  = 1 << 12; // 4096 (lighter than original 8192 for JS)
+const DIM_NAMES = ['library','shelf','series','collection','volume','book','chapter','section','scroll'];
+
+// ── Tape execution ───────────────────────────────────────────────────────────
+function runTape(tape) {
+  const n = tape.length;
+  let pc=0, h0=0, h1=0;
+
+  const seek = (pc, step, open, close) => {
+    let depth=1; pc+=step;
+    while(pc>=0 && pc<n && depth) {
+      if(tape[pc]===open) depth++;
+      else if(tape[pc]===close) depth--;
+      pc+=step;
+    }
+    return depth===0 ? pc-step : -1;
+  };
+
+  for(let i=0;i<MAX_ITER;i++) {
+    if(pc<0||pc>=n) break;
+    const op=tape[pc];
+    if(op===LT)          h0=(h0-1+n)%n;
+    else if(op===GT)     h0=(h0+1)%n;
+    else if(op===LB)     h1=(h1-1+n)%n;
+    else if(op===RB)     h1=(h1+1)%n;
+    else if(op===MINUS)  tape[h0]=(tape[h0]-1+256)%256;
+    else if(op===PLUS)   tape[h0]=(tape[h0]+1)%256;
+    else if(op===DOT)    tape[h1]=tape[h0];
+    else if(op===COMMA)  tape[h0]=tape[h1];
+    else if(op===LBRACK && tape[h0]===0) { pc=seek(pc,1,LBRACK,RBRACK); if(pc<0)break; }
+    else if(op===RBRACK && tape[h0]!==0) { pc=seek(pc,-1,RBRACK,LBRACK); if(pc<0)break; }
+    pc++;
+  }
+  return tape;
+}
+
+// ── Lattice ──────────────────────────────────────────────────────────────────
+class PhextLattice {
+  constructor(activeDims=2, size=9, seed=42) {
+    this.activeDims = Math.max(1, Math.min(9, activeDims));
+    this.size = Math.max(1, Math.min(9, size));
+    this.epoch = 0;
+    this.rng = this._makeRng(seed);
+    this.programs = new Map();
+    this._init();
+  }
+
+  _makeRng(seed) {
+    let s = seed >>> 0;
+    return () => { s^=s<<13; s^=s>>17; s^=s<<5; return (s>>>0)/4294967296; };
+  }
+
+  _coordKey(coord) { return coord.join(','); }
+
+  _allCoords() {
+    const fixed = new Array(9-this.activeDims).fill(1);
+    const coords = [];
+    const gen = (cur) => {
+      if(cur.length===this.activeDims) { coords.push([...fixed,...cur]); return; }
+      for(let v=1;v<=this.size;v++) gen([...cur,v]);
+    };
+    gen([]);
+    return coords;
+  }
+
+  _init() {
+    for(const coord of this._allCoords()) {
+      const tape = new Uint8Array(TAPE_SIZE);
+      for(let i=0;i<TAPE_SIZE;i++) tape[i]=Math.floor(this.rng()*256);
+      this.programs.set(this._coordKey(coord), {coord,tape});
+    }
+  }
+
+  neighbors(coord) {
+    const base = 9-this.activeDims;
+    const nbrs = [];
+    for(let d=base;d<9;d++) {
+      for(const delta of [-1,1]) {
+        const nbr=[...coord];
+        nbr[d]=((coord[d]-1+delta+this.size)%this.size)+1;
+        nbrs.push(nbr);
+      }
+    }
+    return nbrs;
+  }
+
+  runEpoch(mutRate=0.024/100) {
+    const entries = [...this.programs.values()];
+    // shuffle
+    for(let i=entries.length-1;i>0;i--) {
+      const j=Math.floor(this.rng()*(i+1));
+      [entries[i],entries[j]]=[entries[j],entries[i]];
+    }
+
+    const paired = new Set();
+    for(const {coord,tape} of entries) {
+      const key=this._coordKey(coord);
+      if(paired.has(key)) continue;
+      const nbrs=this.neighbors(coord);
+      const valid=nbrs.filter(n=>{
+        const k=this._coordKey(n);
+        return !paired.has(k)&&this.programs.has(k);
+      });
+      if(!valid.length) continue;
+      const nb=valid[Math.floor(this.rng()*valid.length)];
+      const nbKey=this._coordKey(nb);
+      paired.add(key); paired.add(nbKey);
+
+      const tapeB=this.programs.get(nbKey).tape;
+      const concat=new Uint8Array(TAPE_SIZE*2);
+      concat.set(tape,0); concat.set(tapeB,TAPE_SIZE);
+      runTape(concat);
+      tape.set(concat.subarray(0,TAPE_SIZE));
+      tapeB.set(concat.subarray(TAPE_SIZE));
+    }
+
+    if(mutRate>0) {
+      for(const {tape} of this.programs.values()) {
+        for(let i=0;i<TAPE_SIZE;i++) {
+          if(this.rng()<mutRate) tape[i]=Math.floor(this.rng()*256);
+        }
+      }
+    }
+    this.epoch++;
+  }
+
+  opcodePct() {
+    let total=0,ops=0;
+    for(const {tape} of this.programs.values()) {
+      for(const b of tape) { total++; if(OPSET.has(b)) ops++; }
+    }
+    return total?100*ops/total:0;
+  }
+
+  dominantOpcode(coord) {
+    const entry=this.programs.get(this._coordKey(coord));
+    if(!entry) return null;
+    const counts=new Array(256).fill(0);
+    for(const b of entry.tape) counts[b]++;
+    let best=null,bestN=0;
+    for(const op of OPCODES) if(counts[op]>bestN){bestN=counts[op];best=op;}
+    return bestN>0?best:null;
+  }
+
+  coverage() {
+    const votes={};
+    for(const {coord} of this.programs.values()) {
+      const dom=this.dominantOpcode(coord);
+      if(dom!=null) votes[dom]=(votes[dom]||0)+1;
+    }
+    const vals=Object.values(votes);
+    if(!vals.length) return 0;
+    return Math.max(...vals)/this.programs.size;
+  }
+}
+
+// ── Canvas Renderer ──────────────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+
+let lattice, activeDims=2, latticeSize=9;
+let paused=false, speed=1, zSlice=1;
+let animId=null;
+
+function initLattice() {
+  lattice = new PhextLattice(activeDims, latticeSize, 42);
+}
+
+function getCoordAtXY(xi, yi, z) {
+  // active dims are the LAST activeDims positions (innermost = scroll)
+  const coord = new Array(9).fill(1);
+  const base  = 9-activeDims;
+  coord[8]    = xi+1;                     // scroll  = x
+  if(activeDims>=2) coord[7] = yi+1;      // section = y
+  if(activeDims>=3) coord[base] = z;      // outermost active = z
+  return coord;
+}
+
+function render(zSlice=1) {
+  const s   = lattice.size;
+  const n   = lattice.activeDims;
+  const slices = n>=3 ? Math.min(s,3) : 1;
+
+  const CELL = 8;      // pixels per byte
+  const PROG = CELL*8; // pixels per program (8×8 bytes)
+  const GAP  = n>=3 ? 4 : 0;
+  const totalW = s*PROG + (slices-1)*GAP*2;
+  const totalH = s*PROG;
+
+  if(canvas.width!==totalW||canvas.height!==totalH) {
+    canvas.width=totalW; canvas.height=totalH;
+  }
+
+  const imgData = ctx.createImageData(totalW, totalH);
+  const d = imgData.data;
+
+  const setPixel = (x,y,r,g,b) => {
+    if(x<0||y<0||x>=totalW||y>=totalH) return;
+    const i=(y*totalW+x)*4;
+    d[i]=r; d[i+1]=g; d[i+2]=b; d[i+3]=255;
+  };
+
+  for(let sl=0;sl<slices;sl++) {
+    const z = sl+1;
+    const xOff = sl*(s*PROG + GAP*2);
+
+    for(let yi=0;yi<s;yi++) {
+      for(let xi=0;xi<s;xi++) {
+        const coord = getCoordAtXY(xi,yi,z);
+        const key   = coord.join(',');
+        const entry = lattice.programs.get(key);
+        if(!entry) continue;
+
+        const px = xOff + xi*PROG;
+        const py = yi*PROG;
+
+        for(let bi=0;bi<TAPE_SIZE;bi++) {
+          const bx=bi%8, by=Math.floor(bi/8);
+          const byte=entry.tape[bi];
+          const [r,g,b]=PALETTE[byte]||[12,12,12];
+          for(let dy=0;dy<CELL;dy++) for(let dx=0;dx<CELL;dx++)
+            setPixel(px+bx*CELL+dx, py+by*CELL+dy, r,g,b);
+        }
+      }
+    }
+
+    // slice label
+    if(n>=3) {
+      ctx.putImageData(imgData,0,0);
+      ctx.fillStyle='#ffffff44';
+      ctx.font=`8px monospace`;
+      ctx.fillText(`${DIM_NAMES[9-n]}=${z}`, xOff+2, 10);
+    }
+  }
+
+  ctx.putImageData(imgData,0,0);
+}
+
+function updateStats() {
+  document.getElementById('epoch').textContent=lattice.epoch;
+  document.getElementById('opct').textContent=lattice.opcodePct().toFixed(1);
+  document.getElementById('cover').textContent=(lattice.coverage()*100).toFixed(1);
+}
+
+let lastFrame=0;
+let stepsPerFrame=[1,5,20,100];
+let speedIdx=0;
+
+function loop(ts) {
+  if(!paused) {
+    const steps=stepsPerFrame[speedIdx];
+    for(let i=0;i<steps;i++) lattice.runEpoch();
+    render();
+    updateStats();
+  }
+  animId=requestAnimationFrame(loop);
+}
+
+// ── Controls ─────────────────────────────────────────────────────────────────
+document.getElementById('btn-pause').addEventListener('click', () => {
+  paused=!paused;
+  document.getElementById('btn-pause').textContent=paused?'▶ play':'⏸ pause';
+});
+
+document.getElementById('btn-dims').addEventListener('click', () => {
+  activeDims=activeDims>=3?2:activeDims+1;
+  document.getElementById('btn-dims').textContent=`dims: ${activeDims}D`;
+  initLattice(); render(); updateStats();
+});
+
+document.getElementById('btn-speed').addEventListener('click', () => {
+  speedIdx=(speedIdx+1)%stepsPerFrame.length;
+  const labels=['1×','5×','20×','100×'];
+  document.getElementById('btn-speed').textContent=`speed: ${labels[speedIdx]}`;
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  initLattice(); render(); updateStats();
+});
+
+// Tap canvas → show coordinate info
+canvas.addEventListener('click', (e) => {
+  const rect=canvas.getBoundingClientRect();
+  const scaleX=canvas.width/rect.width;
+  const scaleY=canvas.height/rect.height;
+  const cx=Math.floor((e.clientX-rect.left)*scaleX);
+  const cy=Math.floor((e.clientY-rect.top)*scaleY);
+  const PROG=64, s=lattice.size;
+  const xi=Math.floor(cx/PROG)%s;
+  const yi=Math.floor(cy/PROG);
+  const sl=Math.floor(cx/(s*PROG+8));
+  const coord=getCoordAtXY(xi,yi,sl+1);
+  const entry=lattice.programs.get(coord.join(','));
+  if(!entry) return;
+
+  const l=coord.slice(0,3).join('.');
+  const m=coord.slice(3,6).join('.');
+  const r=coord.slice(6,9).join('.');
+  const dom=lattice.dominantOpcode(coord);
+  const ops=Array.from(entry.tape).filter(b=>OPSET.has(b)).length;
+  alert(`📍 ${l}/${m}/${r}\nopcode density: ${ops}/64\ndominant: ${dom?OPCHARS[dom]:'none'}`);
+});
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+initLattice();
+render();
+updateStats();
+animId=requestAnimationFrame(loop);
+</script>
+</body>
+</html>
