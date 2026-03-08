@@ -1,24 +1,30 @@
-# Output directories
-output*/
-test_run/
-*.png
-*.gif
-
 # Python
+venv/
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
 
-# Jupyter
-.ipynb_checkpoints
+# Rust/WASM
+phext-life-wasm/target/
+phext-life-wasm/Cargo.lock
+pkg/
 
-# IDEs
+# Output
+test_run/
+demo_output/
+*.png
+*.gif
+*.mp4
+output/
+
+# Editors
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
 # OS
 .DS_Store

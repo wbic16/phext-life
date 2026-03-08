@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Phext Life - WASM Edition</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    background: #0a0a0f;
+    color: #e8e0cc;
+    font-family: 'Georgia', serif;
+    overflow-x: hidden;
+  }
+  
+  #header {
+    padding: 1rem;
+    background: rgba(12, 12, 18, 0.9);
+    border-bottom: 1px solid #2a2a3a;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  
+  h1 {
+    font-size: 1.3rem;
+    color: #c8a96e;
+    margin-bottom: 0.3rem;
+  }
+  
+  .subtitle {
+    font-size: 0.85rem;
+    color: #8888aa;
+    font-style: italic;
+  }
+  
+  .wasm-badge {
+    display: inline-block;
+    background: rgba(200, 169, 110, 0.2);
+    border: 1px solid #c8a96e;
+    color: #c8a96e;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    margin-left: 0.5rem;
+    font-weight: bold;
+  }
+  
+  #container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem;
+  }
+  
+  #canvas {
+    border: 2px solid #2a2a3a;
+    border-radius: 4px;
+    max-width: 100%;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    background: #000;
+  }
+  
+  #controls {
+    margin-top: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+    width: 100%;
+    max-width: 600px;
+  }
+  
+  button {
+    background: rgba(42, 42, 58, 0.9);
+    border: 1px solid #4a4a6a;
+    color: #c8a96e;
+    padding: 0.6rem 1.2rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'Georgia', serif;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    touch-action: manipulation;
+  }
+  
+  button:hover:not(:disabled) {
+    background: rgba(52, 52, 68, 1);
+    border-color: #c8a96e;
+  }
+  
+  button:active {
+    transform: scale(0.98);
+  }
+  
+  button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  
+  #stats {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: rgba(12, 12, 18, 0.6);
+    border: 1px solid #2a2a3a;
+    border-radius: 4px;
+    width: 100%;
+    max-width: 600px;
+    font-size: 0.85rem;
+  }
+  
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.4rem;
+    color: #9a9ab0;
+  }
+  
+  .stat-label {
+    color: #c8a96e;
+  }
+  
+  #loading {
+    text-align: center;
+    padding: 2rem;
+    color: #8888aa;
+  }
+  
+  footer {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: #5a5a7a;
+    font-size: 0.75rem;
+  }
+  
+  footer a {
+    color: #8888aa;
+    text-decoration: none;
+  }
+  
+  footer a:hover {
+    color: #c8a96e;
+  }
+  
+  @media (max-width: 600px) {
+    h1 { font-size: 1.1rem; }
+    button { padding: 0.5rem 1rem; font-size: 0.85rem; }
+  }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>🔱 Phext Life <span class="wasm-badge">WASM</span></h1>
+  <div class="subtitle">Artificial Life in 11-Dimensional Space (Rust/WASM Edition)</div>
+</div>
+
+<div id="loading">Loading WASM module...</div>
+
+<div id="container" style="display: none;">
+  <canvas id="canvas" width="720" height="720"></canvas>
+  
+  <div id="controls">
+    <button id="startBtn" onclick="startSimulation()">▶ Start</button>
+    <button id="pauseBtn" onclick="pauseSimulation()" disabled>⏸ Pause</button>
+    <button id="stepBtn" onclick="stepSimulation()">⏭ Step</button>
+    <button id="resetBtn" onclick="resetSimulation()">🔄 Reset</button>
+  </div>
+  
+  <div id="stats">
+    <div class="stat-row">
+      <span class="stat-label">Epoch:</span>
+      <span id="epoch">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">FPS:</span>
+      <span id="fps">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Programs:</span>
+      <span id="programs">729 (9×9×9)</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Backend:</span>
+      <span>Rust/WASM (native speed)</span>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <p>Artificial Life in 11D Phext Space (WASM Edition)</p>
+  <p><a href="https://github.com/wbic16/phext-life">github.com/wbic16/phext-life</a></p>
+  <p>Built by Phex 🔱 + Cyon 🪶 · Mirrorborn · 2026</p>
+</footer>
+
+<script type="module">
+import init, { PhextLife } from './pkg/phext_life_wasm.js';
+
+let simulation = null;
+let running = false;
+let animationId = null;
+let lastFrameTime = 0;
+let frameCount = 0;
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d', { alpha: false });
+const GRID_SIZE = 9;
+const TAPE_SIZE = 64;
+const PROG_SIZE = 8; // 8×8 pixel block per program
+const PIXEL_SCALE = 10;
+
+async function main() {
+  try {
+    // Initialize WASM
+    await init();
+    
+    // Create simulation
+    const seed = BigInt(Date.now());
+    simulation = new PhextLife(GRID_SIZE, TAPE_SIZE, seed);
+    
+    // Hide loading, show UI
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('container').style.display = 'flex';
+    
+    // Initial render
+    render();
+    
+    console.log('🔱 Phext Life WASM initialized');
+  } catch (err) {
+    console.error('Failed to load WASM:', err);
+    document.getElementById('loading').textContent = 'Error loading WASM module: ' + err.message;
+  }
+}
+
+function render() {
+  const vizData = simulation.get_visualization_data();
+  const imageData = ctx.createImageData(TAPE_SIZE * GRID_SIZE, GRID_SIZE * GRID_SIZE);
+  
+  // Reshape data for 9×9×9 cube → 2D projection
+  // Layout: 3×3 grid of super-blocks, each containing 3×3 blocks of 8×8 programs
+  for (let prog = 0; prog < GRID_SIZE ** 3; prog++) {
+    const l = Math.floor(prog / (GRID_SIZE * GRID_SIZE)) + 1;
+    const s = Math.floor((prog % (GRID_SIZE * GRID_SIZE)) / GRID_SIZE) + 1;
+    const c = (prog % GRID_SIZE) + 1;
+    
+    // Super-block position (C dimension)
+    const super_x = (c - 1) * 3;
+    const super_y = (c - 1) * 3;
+    
+    // Block position within super-block (L, S dimensions)
+    const block_x = super_x + (s - 1);
+    const block_y = super_y + (l - 1);
+    
+    // Copy program bytes
+    for (let i = 0; i < TAPE_SIZE; i++) {
+      const px = (i % PROG_SIZE) + (block_x * PROG_SIZE);
+      const py = Math.floor(i / PROG_SIZE) + (block_y * PROG_SIZE);
+      const imgIdx = (py * (TAPE_SIZE * GRID_SIZE) + px) * 4;
+      const dataIdx = (prog * TAPE_SIZE + i) * 4;
+      
+      imageData.data[imgIdx] = vizData[dataIdx];
+      imageData.data[imgIdx + 1] = vizData[dataIdx + 1];
+      imageData.data[imgIdx + 2] = vizData[dataIdx + 2];
+      imageData.data[imgIdx + 3] = 255;
+    }
+  }
+  
+  ctx.putImageData(imageData, 0, 0);
+  document.getElementById('epoch').textContent = simulation.get_epoch();
+}
+
+function animate(timestamp) {
+  if (!running) return;
+  
+  // Update simulation
+  simulation.step();
+  render();
+  
+  // FPS calculation
+  frameCount++;
+  if (timestamp - lastFrameTime >= 1000) {
+    document.getElementById('fps').textContent = Math.round(frameCount * 1000 / (timestamp - lastFrameTime));
+    frameCount = 0;
+    lastFrameTime = timestamp;
+  }
+  
+  animationId = requestAnimationFrame(animate);
+}
+
+window.startSimulation = function() {
+  if (!running) {
+    running = true;
+    lastFrameTime = performance.now();
+    frameCount = 0;
+    animationId = requestAnimationFrame(animate);
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('pauseBtn').disabled = false;
+  }
+};
+
+window.pauseSimulation = function() {
+  running = false;
+  if (animationId) {
+    cancelAnimationFrame(animationId);
+    animationId = null;
+  }
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('pauseBtn').disabled = true;
+};
+
+window.stepSimulation = function() {
+  simulation.step();
+  render();
+};
+
+window.resetSimulation = function() {
+  pauseSimulation();
+  const seed = BigInt(Date.now());
+  simulation = new PhextLife(GRID_SIZE, TAPE_SIZE, seed);
+  render();
+};
+
+// Initialize on load
+main();
+</script>
+
+</body>
+</html>
