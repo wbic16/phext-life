@@ -1,0 +1,32 @@
+{
+  "name": "phext-life",
+  "type": "module",
+  "collaborators": [
+    "Will Bickford <will@phext.io>",
+    "Lux 🔆 <lux@agentmail.to>"
+  ],
+  "description": "9D Artificial Life Simulation in Phext Space",
+  "version": "0.1.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wbic16/phext-life"
+  },
+  "files": [
+    "phext_life_bg.wasm",
+    "phext_life.js",
+    "phext_life.d.ts"
+  ],
+  "main": "phext_life.js",
+  "types": "phext_life.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ],
+  "keywords": [
+    "artificial-life",
+    "phext",
+    "simulation",
+    "9d",
+    "cellular-automata"
+  ]
+}
