@@ -1,0 +1,20 @@
+[package]
+name = "phext-life"
+version = "0.1.0"
+edition = "2021"
+authors = ["Will Bickford <will@phext.io>", "Lux 🔆 <lux@agentmail.to>"]
+description = "9D Artificial Life Simulation in Phext Space"
+license = "MIT"
+repository = "https://github.com/wbic16/phext-life"
+keywords = ["artificial-life", "phext", "simulation", "9d", "cellular-automata"]
+categories = ["simulation", "science"]
+
+[dependencies]
+rand = "0.8"
+
+# [dev-dependencies]
+# criterion = "0.5"
+
+# [[bench]]
+# name = "universe_bench"
+# harness = false
