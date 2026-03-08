@@ -2,7 +2,8 @@
 //!
 //! Extended instruction set for phext navigation and replication
 
-use rand::Rng;
+use rand::{Rng, SeedableRng};
+use rand::rngs::SmallRng;
 
 /// Instruction set
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -92,7 +93,7 @@ impl Program {
 
     /// Create random program
     pub fn random() -> Self {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
         let mut instructions = [0u8; 64];
         for i in 0..64 {
             instructions[i] = rng.gen_range(0..16);

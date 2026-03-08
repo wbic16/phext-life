@@ -21,8 +21,9 @@ impl Coordinate {
 
     /// Random coordinate within extents
     pub fn random(extents: &[u8; 9]) -> Self {
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
+        use rand::{Rng, SeedableRng};
+use rand::rngs::SmallRng;
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
         let mut dims = [0u8; 9];
         for i in 0..9 {
             dims[i] = rng.gen_range(1..=extents[i]);

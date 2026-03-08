@@ -1,93 +1,69 @@
 /* tslint:disable */
 /* eslint-disable */
 
-/**
- * WASM-exposed universe wrapper
- */
 export class PhextLife {
     free(): void;
     [Symbol.dispose](): void;
     /**
-     * Get current tick number
+     * Create a new simulation. extents: [d0,d1,...,d8] each 1–9.
+     * canvas_w, canvas_h: pixel dimensions of target canvas.
      */
-    current_tick(): bigint;
+    constructor(canvas_w: number, canvas_h: number);
     /**
-     * Get dimensional density for given dimension (0-8)
-     */
-    density(dim: number): Uint32Array;
-    /**
-     * Create medium simulation
-     */
-    static medium(): PhextLife;
-    /**
-     * Create new simulation with given size
-     */
-    constructor(size: number, fill_ratio: number);
-    /**
-     * Get population count
+     * Current population.
      */
     population(): number;
     /**
-     * Get 2D projection of occupied coordinates
-     * Projects 9D to 2D by summing dimension pairs
-     * Returns flat array of (x, y, intensity) triples
+     * Render the 9D universe to RGBA pixel data using a twisted projection.
+     *
+     * Projection: Z-order (Morton) curve over the 9 dimensions →
+     * a space-filling 2D image that preserves locality.
+     * Each pixel = one program slot; color = dominant instruction in that cell.
+     * Black = empty.
      */
-    projection_2d(width: number, height: number): Uint8Array;
+    render(ctx: CanvasRenderingContext2D): void;
     /**
-     * Get RGB image data for canvas (RGBA format)
-     */
-    render_rgba(width: number, height: number): Uint8Array;
-    /**
-     * Run multiple ticks
-     */
-    run(ticks: number): void;
-    /**
-     * Create small test simulation (3^9 = 19,683 coordinates)
-     */
-    static small(): PhextLife;
-    /**
-     * Get stats as JSON string
-     */
-    stats_json(): string;
-    /**
-     * Run one tick
+     * Run one simulation tick.
      */
     tick(): void;
     /**
-     * Get total coordinates
+     * Run N ticks at once (for speed).
+     */
+    tick_n(n: number): void;
+    /**
+     * Current tick number.
+     */
+    ticks(): bigint;
+    /**
+     * Total possible coordinates.
      */
     total_coordinates(): number;
+    /**
+     * Total replication events.
+     */
+    total_replications(): bigint;
 }
-
-/**
- * Initialize panic hook for better error messages
- */
-export function init(): void;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_phextlife_free: (a: number, b: number) => void;
-    readonly init: () => void;
-    readonly phextlife_current_tick: (a: number) => bigint;
-    readonly phextlife_density: (a: number, b: number) => [number, number];
-    readonly phextlife_medium: () => number;
     readonly phextlife_new: (a: number, b: number) => number;
     readonly phextlife_population: (a: number) => number;
-    readonly phextlife_projection_2d: (a: number, b: number, c: number) => [number, number];
-    readonly phextlife_render_rgba: (a: number, b: number, c: number) => [number, number];
-    readonly phextlife_run: (a: number, b: number) => void;
-    readonly phextlife_small: () => number;
-    readonly phextlife_stats_json: (a: number) => [number, number];
+    readonly phextlife_render: (a: number, b: any) => [number, number];
     readonly phextlife_tick: (a: number) => void;
+    readonly phextlife_tick_n: (a: number, b: number) => void;
+    readonly phextlife_ticks: (a: number) => bigint;
     readonly phextlife_total_coordinates: (a: number) => number;
+    readonly phextlife_total_replications: (a: number) => bigint;
+    readonly __wbindgen_free: (a: number, b: number, c: number) => void;
     readonly __wbindgen_exn_store: (a: number) => void;
     readonly __externref_table_alloc: () => number;
     readonly __wbindgen_externrefs: WebAssembly.Table;
-    readonly __wbindgen_free: (a: number, b: number, c: number) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+    readonly __externref_table_dealloc: (a: number) => void;
     readonly __wbindgen_start: () => void;
 }
 

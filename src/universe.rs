@@ -1,6 +1,8 @@
 //! 9D Universe containing programs at phext coordinates
 
 use std::collections::HashMap;
+use rand::{Rng, SeedableRng};
+use rand::rngs::SmallRng;
 use crate::coordinate::Coordinate;
 use crate::program::{Program, StepResult};
 
@@ -17,7 +19,7 @@ impl Universe {
     /// Create universe with given extents, randomly populated
     pub fn new(extents: [u8; 9], fill_ratio: f64) -> Self {
         let mut programs = HashMap::new();
-        let _rng = rand::thread_rng();
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
 
         // Calculate total coordinates
         let total: usize = extents.iter().map(|&e| e as usize).product();

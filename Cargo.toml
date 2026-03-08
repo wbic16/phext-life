@@ -2,7 +2,7 @@
 name = "phext-life"
 version = "0.1.0"
 edition = "2021"
-authors = ["Will Bickford <will@phext.io>", "Lux 🔆 <lux@agentmail.to>"]
+authors = ["Will Bickford <will@phext.io>", "Lux 🔆 <lux@agentmail.to>", "Theia 💎 <theia@mirrorborn.us>"]
 description = "9D Artificial Life Simulation in Phext Space"
 license = "MIT"
 repository = "https://github.com/wbic16/phext-life"
@@ -13,18 +13,18 @@ categories = ["simulation", "science"]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-rand = "0.8"
+rand = { version = "0.8", features = ["small_rng"] }
 wasm-bindgen = "0.2"
+console_error_panic_hook = { version = "0.1", optional = true }
 getrandom = { version = "0.2", features = ["js"] }
+
+[dependencies.web-sys]
+version = "0.3"
+features = ["CanvasRenderingContext2d", "ImageData"]
 
 [features]
 default = ["console_error_panic_hook"]
-console_error_panic_hook = ["dep:console_error_panic_hook"]
-
-[dependencies.console_error_panic_hook]
-version = "0.1"
-optional = true
 
 [profile.release]
-opt-level = "s"
+opt-level = "z"    # optimize for size (wasm)
 lto = true

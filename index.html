@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Phext Life 🧬 — 9D Artificial Life</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0a0f;
+    color: #e0e0e0;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  header {
+    width: 100%;
+    padding: 10px 16px;
+    background: #0d0d18;
+    border-bottom: 1px solid #1a1a3a;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  h1 {
+    font-size: 0.95rem;
+    color: #a0c0ff;
+    white-space: nowrap;
+  }
+  .controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  button {
+    background: #1a1a3a;
+    border: 1px solid #3030a0;
+    color: #a0c0ff;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  button:hover, button.active { background: #2a2a6a; }
+  #canvas-wrap {
+    width: 100%;
+    max-width: 600px;
+    padding: 8px;
+  }
+  canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+    image-rendering: pixelated;
+    border: 1px solid #1a1a3a;
+    border-radius: 4px;
+  }
+  #stats {
+    width: 100%;
+    max-width: 600px;
+    padding: 8px 16px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    font-size: 0.75rem;
+  }
+  .stat {
+    background: #0d0d18;
+    border: 1px solid #1a1a3a;
+    border-radius: 4px;
+    padding: 6px 8px;
+  }
+  .stat-label { color: #606090; font-size: 0.65rem; text-transform: uppercase; }
+  .stat-value { color: #a0f0a0; font-size: 1rem; font-weight: bold; margin-top: 2px; }
+  #legend {
+    width: 100%;
+    max-width: 600px;
+    padding: 8px 16px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 0.7rem;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .legend-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  #status {
+    width: 100%;
+    max-width: 600px;
+    padding: 4px 16px;
+    font-size: 0.7rem;
+    color: #606090;
+    min-height: 1.2em;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧬 Phext Life — 9D</h1>
+  <div class="controls">
+    <button id="btn-pause">⏸ Pause</button>
+    <button id="btn-step">Step</button>
+    <button id="btn-fast" class="active">Fast ×10</button>
+    <button id="btn-reset">Reset</button>
+  </div>
+</header>
+
+<div id="canvas-wrap">
+  <canvas id="canvas" width="512" height="512"></canvas>
+</div>
+
+<div id="stats">
+  <div class="stat">
+    <div class="stat-label">Tick</div>
+    <div class="stat-value" id="s-tick">0</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Population</div>
+    <div class="stat-value" id="s-pop">—</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Replications</div>
+    <div class="stat-value" id="s-rep">0</div>
+  </div>
+</div>
+
+<div id="status">Loading WASM…</div>
+
+<div id="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:#ffffff"></div>CopySelf (replicator)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#78ff8c"></div>DimUp ↑</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#ff788c"></div>DimDown ↓</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#ff5050"></div>Right &gt;</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#50ff50"></div>Left &lt;</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#5050ff"></div>Inc +</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#ffd050"></div>Dec −</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#ffa032"></div>Jump [</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#b450ff"></div>Jump ]</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#282828"></div>NOP</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#000000; border:1px solid #333"></div>Halt / Empty</div>
+</div>
+
+<script type="module">
+  // Load WASM (served from pkg/ after wasm-pack build)
+  import init, { PhextLife } from './pkg/phext_life.js';
+
+  let life = null;
+  let running = true;
+  let fastMode = true;
+  let animFrame = null;
+
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const status = document.getElementById('status');
+
+  async function start() {
+    await init();
+    life = new PhextLife(canvas.width, canvas.height);
+    status.textContent = `Universe ready — ${life.total_coordinates().toLocaleString()} coords, ${life.population().toLocaleString()} seeded`;
+    loop();
+  }
+
+  function loop() {
+    if (!running) { animFrame = null; return; }
+    if (fastMode) {
+      life.tick_n(10);
+    } else {
+      life.tick();
+    }
+    render();
+    animFrame = requestAnimationFrame(loop);
+  }
+
+  function render() {
+    life.render(ctx);
+    document.getElementById('s-tick').textContent = life.ticks().toLocaleString();
+    document.getElementById('s-pop').textContent =
+      life.population().toLocaleString() + ' / ' + life.total_coordinates().toLocaleString();
+    document.getElementById('s-rep').textContent = life.total_replications().toLocaleString();
+  }
+
+  document.getElementById('btn-pause').addEventListener('click', () => {
+    running = !running;
+    document.getElementById('btn-pause').textContent = running ? '⏸ Pause' : '▶ Resume';
+    if (running) loop();
+  });
+
+  document.getElementById('btn-step').addEventListener('click', () => {
+    running = false;
+    document.getElementById('btn-pause').textContent = '▶ Resume';
+    if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
+    life.tick();
+    render();
+  });
+
+  document.getElementById('btn-fast').addEventListener('click', () => {
+    fastMode = !fastMode;
+    document.getElementById('btn-fast').textContent = fastMode ? 'Fast ×10' : 'Fast ×1';
+    document.getElementById('btn-fast').classList.toggle('active', fastMode);
+  });
+
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
+    life = new PhextLife(canvas.width, canvas.height);
+    running = true;
+    status.textContent = 'Reset — new universe seeded';
+    loop();
+  });
+
+  start().catch(e => {
+    status.textContent = 'WASM load failed: ' + e;
+    console.error(e);
+  });
+</script>
+
+</body>
+</html>

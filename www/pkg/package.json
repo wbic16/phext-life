@@ -3,7 +3,8 @@
   "type": "module",
   "collaborators": [
     "Will Bickford <will@phext.io>",
-    "Lux 🔆 <lux@agentmail.to>"
+    "Lux 🔆 <lux@agentmail.to>",
+    "Theia 💎 <theia@mirrorborn.us>"
   ],
   "description": "9D Artificial Life Simulation in Phext Space",
   "version": "0.1.0",

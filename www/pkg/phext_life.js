@@ -1,16 +1,6 @@
 /* @ts-self-types="./phext_life.d.ts" */
 
-/**
- * WASM-exposed universe wrapper
- */
 export class PhextLife {
-    static __wrap(ptr) {
-        ptr = ptr >>> 0;
-        const obj = Object.create(PhextLife.prototype);
-        obj.__wbg_ptr = ptr;
-        PhextLifeFinalization.register(obj, obj.__wbg_ptr, obj);
-        return obj;
-    }
     __destroy_into_raw() {
         const ptr = this.__wbg_ptr;
         this.__wbg_ptr = 0;
@@ -22,45 +12,19 @@ export class PhextLife {
         wasm.__wbg_phextlife_free(ptr, 0);
     }
     /**
-     * Get current tick number
-     * @returns {bigint}
+     * Create a new simulation. extents: [d0,d1,...,d8] each 1–9.
+     * canvas_w, canvas_h: pixel dimensions of target canvas.
+     * @param {number} canvas_w
+     * @param {number} canvas_h
      */
-    current_tick() {
-        const ret = wasm.phextlife_current_tick(this.__wbg_ptr);
-        return BigInt.asUintN(64, ret);
-    }
-    /**
-     * Get dimensional density for given dimension (0-8)
-     * @param {number} dim
-     * @returns {Uint32Array}
-     */
-    density(dim) {
-        const ret = wasm.phextlife_density(this.__wbg_ptr, dim);
-        var v1 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
-        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
-        return v1;
-    }
-    /**
-     * Create medium simulation
-     * @returns {PhextLife}
-     */
-    static medium() {
-        const ret = wasm.phextlife_medium();
-        return PhextLife.__wrap(ret);
-    }
-    /**
-     * Create new simulation with given size
-     * @param {number} size
-     * @param {number} fill_ratio
-     */
-    constructor(size, fill_ratio) {
-        const ret = wasm.phextlife_new(size, fill_ratio);
+    constructor(canvas_w, canvas_h) {
+        const ret = wasm.phextlife_new(canvas_w, canvas_h);
         this.__wbg_ptr = ret >>> 0;
         PhextLifeFinalization.register(this, this.__wbg_ptr, this);
         return this;
     }
     /**
-     * Get population count
+     * Current population.
      * @returns {number}
      */
     population() {
@@ -68,116 +32,65 @@ export class PhextLife {
         return ret >>> 0;
     }
     /**
-     * Get 2D projection of occupied coordinates
-     * Projects 9D to 2D by summing dimension pairs
-     * Returns flat array of (x, y, intensity) triples
-     * @param {number} width
-     * @param {number} height
-     * @returns {Uint8Array}
+     * Render the 9D universe to RGBA pixel data using a twisted projection.
+     *
+     * Projection: Z-order (Morton) curve over the 9 dimensions →
+     * a space-filling 2D image that preserves locality.
+     * Each pixel = one program slot; color = dominant instruction in that cell.
+     * Black = empty.
+     * @param {CanvasRenderingContext2D} ctx
      */
-    projection_2d(width, height) {
-        const ret = wasm.phextlife_projection_2d(this.__wbg_ptr, width, height);
-        var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-        return v1;
-    }
-    /**
-     * Get RGB image data for canvas (RGBA format)
-     * @param {number} width
-     * @param {number} height
-     * @returns {Uint8Array}
-     */
-    render_rgba(width, height) {
-        const ret = wasm.phextlife_render_rgba(this.__wbg_ptr, width, height);
-        var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-        return v1;
-    }
-    /**
-     * Run multiple ticks
-     * @param {number} ticks
-     */
-    run(ticks) {
-        wasm.phextlife_run(this.__wbg_ptr, ticks);
-    }
-    /**
-     * Create small test simulation (3^9 = 19,683 coordinates)
-     * @returns {PhextLife}
-     */
-    static small() {
-        const ret = wasm.phextlife_small();
-        return PhextLife.__wrap(ret);
-    }
-    /**
-     * Get stats as JSON string
-     * @returns {string}
-     */
-    stats_json() {
-        let deferred1_0;
-        let deferred1_1;
-        try {
-            const ret = wasm.phextlife_stats_json(this.__wbg_ptr);
-            deferred1_0 = ret[0];
-            deferred1_1 = ret[1];
-            return getStringFromWasm0(ret[0], ret[1]);
-        } finally {
-            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+    render(ctx) {
+        const ret = wasm.phextlife_render(this.__wbg_ptr, ctx);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
         }
     }
     /**
-     * Run one tick
+     * Run one simulation tick.
      */
     tick() {
         wasm.phextlife_tick(this.__wbg_ptr);
     }
     /**
-     * Get total coordinates
+     * Run N ticks at once (for speed).
+     * @param {number} n
+     */
+    tick_n(n) {
+        wasm.phextlife_tick_n(this.__wbg_ptr, n);
+    }
+    /**
+     * Current tick number.
+     * @returns {bigint}
+     */
+    ticks() {
+        const ret = wasm.phextlife_ticks(this.__wbg_ptr);
+        return BigInt.asUintN(64, ret);
+    }
+    /**
+     * Total possible coordinates.
      * @returns {number}
      */
     total_coordinates() {
         const ret = wasm.phextlife_total_coordinates(this.__wbg_ptr);
         return ret >>> 0;
     }
+    /**
+     * Total replication events.
+     * @returns {bigint}
+     */
+    total_replications() {
+        const ret = wasm.phextlife_total_replications(this.__wbg_ptr);
+        return BigInt.asUintN(64, ret);
+    }
 }
 if (Symbol.dispose) PhextLife.prototype[Symbol.dispose] = PhextLife.prototype.free;
-
-/**
- * Initialize panic hook for better error messages
- */
-export function init() {
-    wasm.init();
-}
 
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,
-        __wbg___wbindgen_is_function_3c846841762788c1: function(arg0) {
-            const ret = typeof(arg0) === 'function';
-            return ret;
-        },
-        __wbg___wbindgen_is_object_781bc9f159099513: function(arg0) {
-            const val = arg0;
-            const ret = typeof(val) === 'object' && val !== null;
-            return ret;
-        },
-        __wbg___wbindgen_is_string_7ef6b97b02428fae: function(arg0) {
-            const ret = typeof(arg0) === 'string';
-            return ret;
-        },
-        __wbg___wbindgen_is_undefined_52709e72fb9f179c: function(arg0) {
-            const ret = arg0 === undefined;
-            return ret;
-        },
         __wbg___wbindgen_throw_6ddd609b62940d55: function(arg0, arg1) {
             throw new Error(getStringFromWasm0(arg0, arg1));
-        },
-        __wbg_call_2d781c1f4d5c0ef8: function() { return handleError(function (arg0, arg1, arg2) {
-            const ret = arg0.call(arg1, arg2);
-            return ret;
-        }, arguments); },
-        __wbg_crypto_38df2bab126b63dc: function(arg0) {
-            const ret = arg0.crypto;
-            return ret;
         },
         __wbg_error_a6fa202b58aa1cd3: function(arg0, arg1) {
             let deferred0_0;
@@ -190,42 +103,16 @@ function __wbg_get_imports() {
                 wasm.__wbindgen_free(deferred0_0, deferred0_1, 1);
             }
         },
-        __wbg_getRandomValues_c44a50d8cfdaebeb: function() { return handleError(function (arg0, arg1) {
-            arg0.getRandomValues(arg1);
-        }, arguments); },
-        __wbg_length_ea16607d7b61445b: function(arg0) {
-            const ret = arg0.length;
-            return ret;
-        },
-        __wbg_msCrypto_bd5a034af96bcba6: function(arg0) {
-            const ret = arg0.msCrypto;
-            return ret;
-        },
         __wbg_new_227d7c05414eb861: function() {
             const ret = new Error();
             return ret;
         },
-        __wbg_new_with_length_825018a1616e9e55: function(arg0) {
-            const ret = new Uint8Array(arg0 >>> 0);
+        __wbg_new_with_u8_clamped_array_and_sh_5d9be5b17e50951c: function() { return handleError(function (arg0, arg1, arg2, arg3) {
+            const ret = new ImageData(getClampedArrayU8FromWasm0(arg0, arg1), arg2 >>> 0, arg3 >>> 0);
             return ret;
-        },
-        __wbg_node_84ea875411254db1: function(arg0) {
-            const ret = arg0.node;
-            return ret;
-        },
-        __wbg_process_44c7a14e11e9f69e: function(arg0) {
-            const ret = arg0.process;
-            return ret;
-        },
-        __wbg_prototypesetcall_d62e5099504357e6: function(arg0, arg1, arg2) {
-            Uint8Array.prototype.set.call(getArrayU8FromWasm0(arg0, arg1), arg2);
-        },
-        __wbg_randomFillSync_6c25eac9869eb53c: function() { return handleError(function (arg0, arg1) {
-            arg0.randomFillSync(arg1);
         }, arguments); },
-        __wbg_require_b4edbdcf3e2a1ef0: function() { return handleError(function () {
-            const ret = module.require;
-            return ret;
+        __wbg_putImageData_1750176f4dd07174: function() { return handleError(function (arg0, arg1, arg2, arg3) {
+            arg0.putImageData(arg1, arg2, arg3);
         }, arguments); },
         __wbg_stack_3b0d974bbf31e44f: function(arg0, arg1) {
             const ret = arg1.stack;
@@ -233,40 +120,6 @@ function __wbg_get_imports() {
             const len1 = WASM_VECTOR_LEN;
             getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
             getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
-        },
-        __wbg_static_accessor_GLOBAL_8adb955bd33fac2f: function() {
-            const ret = typeof global === 'undefined' ? null : global;
-            return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
-        },
-        __wbg_static_accessor_GLOBAL_THIS_ad356e0db91c7913: function() {
-            const ret = typeof globalThis === 'undefined' ? null : globalThis;
-            return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
-        },
-        __wbg_static_accessor_SELF_f207c857566db248: function() {
-            const ret = typeof self === 'undefined' ? null : self;
-            return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
-        },
-        __wbg_static_accessor_WINDOW_bb9f1ba69d61b386: function() {
-            const ret = typeof window === 'undefined' ? null : window;
-            return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
-        },
-        __wbg_subarray_a068d24e39478a8a: function(arg0, arg1, arg2) {
-            const ret = arg0.subarray(arg1 >>> 0, arg2 >>> 0);
-            return ret;
-        },
-        __wbg_versions_276b2795b1c6a219: function(arg0) {
-            const ret = arg0.versions;
-            return ret;
-        },
-        __wbindgen_cast_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Ref(Slice(U8)) -> NamedExternref("Uint8Array")`.
-            const ret = getArrayU8FromWasm0(arg0, arg1);
-            return ret;
-        },
-        __wbindgen_cast_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Ref(String) -> Externref`.
-            const ret = getStringFromWasm0(arg0, arg1);
-            return ret;
         },
         __wbindgen_init_externref_table: function() {
             const table = wasm.__wbindgen_externrefs;
@@ -294,14 +147,9 @@ function addToExternrefTable0(obj) {
     return idx;
 }
 
-function getArrayU32FromWasm0(ptr, len) {
+function getClampedArrayU8FromWasm0(ptr, len) {
     ptr = ptr >>> 0;
-    return getUint32ArrayMemory0().subarray(ptr / 4, ptr / 4 + len);
-}
-
-function getArrayU8FromWasm0(ptr, len) {
-    ptr = ptr >>> 0;
-    return getUint8ArrayMemory0().subarray(ptr / 1, ptr / 1 + len);
+    return getUint8ClampedArrayMemory0().subarray(ptr / 1, ptr / 1 + len);
 }
 
 let cachedDataViewMemory0 = null;
@@ -317,20 +165,20 @@ function getStringFromWasm0(ptr, len) {
     return decodeText(ptr, len);
 }
 
-let cachedUint32ArrayMemory0 = null;
-function getUint32ArrayMemory0() {
-    if (cachedUint32ArrayMemory0 === null || cachedUint32ArrayMemory0.byteLength === 0) {
-        cachedUint32ArrayMemory0 = new Uint32Array(wasm.memory.buffer);
-    }
-    return cachedUint32ArrayMemory0;
-}
-
 let cachedUint8ArrayMemory0 = null;
 function getUint8ArrayMemory0() {
     if (cachedUint8ArrayMemory0 === null || cachedUint8ArrayMemory0.byteLength === 0) {
         cachedUint8ArrayMemory0 = new Uint8Array(wasm.memory.buffer);
     }
     return cachedUint8ArrayMemory0;
+}
+
+let cachedUint8ClampedArrayMemory0 = null;
+function getUint8ClampedArrayMemory0() {
+    if (cachedUint8ClampedArrayMemory0 === null || cachedUint8ClampedArrayMemory0.byteLength === 0) {
+        cachedUint8ClampedArrayMemory0 = new Uint8ClampedArray(wasm.memory.buffer);
+    }
+    return cachedUint8ClampedArrayMemory0;
 }
 
 function handleError(f, args) {
@@ -340,10 +188,6 @@ function handleError(f, args) {
         const idx = addToExternrefTable0(e);
         wasm.__wbindgen_exn_store(idx);
     }
-}
-
-function isLikeNone(x) {
-    return x === undefined || x === null;
 }
 
 function passStringToWasm0(arg, malloc, realloc) {
@@ -383,6 +227,12 @@ function passStringToWasm0(arg, malloc, realloc) {
     return ptr;
 }
 
+function takeFromExternrefTable0(idx) {
+    const value = wasm.__wbindgen_externrefs.get(idx);
+    wasm.__externref_table_dealloc(idx);
+    return value;
+}
+
 let cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true, fatal: true });
 cachedTextDecoder.decode();
 const MAX_SAFARI_DECODE_BYTES = 2146435072;
@@ -417,8 +267,8 @@ function __wbg_finalize_init(instance, module) {
     wasm = instance.exports;
     wasmModule = module;
     cachedDataViewMemory0 = null;
-    cachedUint32ArrayMemory0 = null;
     cachedUint8ArrayMemory0 = null;
+    cachedUint8ClampedArrayMemory0 = null;
     wasm.__wbindgen_start();
     return wasm;
 }
