@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Phext Life - Artificial Life in 11D Space</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    background: #0a0a0f;
+    color: #e8e0cc;
+    font-family: 'Georgia', serif;
+    overflow-x: hidden;
+  }
+  
+  #header {
+    padding: 1rem;
+    background: rgba(12, 12, 18, 0.9);
+    border-bottom: 1px solid #2a2a3a;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  
+  h1 {
+    font-size: 1.3rem;
+    color: #c8a96e;
+    margin-bottom: 0.3rem;
+  }
+  
+  .subtitle {
+    font-size: 0.85rem;
+    color: #8888aa;
+    font-style: italic;
+  }
+  
+  #container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem;
+  }
+  
+  #canvas {
+    border: 2px solid #2a2a3a;
+    border-radius: 4px;
+    max-width: 100%;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    background: #000;
+  }
+  
+  #controls {
+    margin-top: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+    width: 100%;
+    max-width: 600px;
+  }
+  
+  button {
+    background: rgba(42, 42, 58, 0.9);
+    border: 1px solid #4a4a6a;
+    color: #c8a96e;
+    padding: 0.6rem 1.2rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'Georgia', serif;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    touch-action: manipulation;
+  }
+  
+  button:hover:not(:disabled) {
+    background: rgba(52, 52, 68, 1);
+    border-color: #c8a96e;
+  }
+  
+  button:active {
+    transform: scale(0.98);
+  }
+  
+  button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  
+  #stats {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: rgba(12, 12, 18, 0.6);
+    border: 1px solid #2a2a3a;
+    border-radius: 4px;
+    width: 100%;
+    max-width: 600px;
+    font-size: 0.85rem;
+  }
+  
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.4rem;
+    color: #9a9ab0;
+  }
+  
+  .stat-label {
+    color: #c8a96e;
+  }
+  
+  #legend {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: rgba(12, 12, 18, 0.6);
+    border: 1px solid #2a2a3a;
+    border-radius: 4px;
+    width: 100%;
+    max-width: 600px;
+  }
+  
+  .legend-title {
+    color: #c8a96e;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .legend-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.3rem;
+    font-size: 0.75rem;
+  }
+  
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  
+  .legend-color {
+    width: 14px;
+    height: 14px;
+    border: 1px solid #4a4a6a;
+    border-radius: 2px;
+  }
+  
+  footer {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: #5a5a7a;
+    font-size: 0.75rem;
+  }
+  
+  footer a {
+    color: #8888aa;
+    text-decoration: none;
+  }
+  
+  footer a:hover {
+    color: #c8a96e;
+  }
+  
+  @media (max-width: 600px) {
+    h1 { font-size: 1.1rem; }
+    button { padding: 0.5rem 1rem; font-size: 0.85rem; }
+    #legend { font-size: 0.7rem; }
+  }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>🔱 Phext Life</h1>
+  <div class="subtitle">Artificial Life in 11-Dimensional Space</div>
+</div>
+
+<div id="container">
+  <canvas id="canvas" width="810" height="810"></canvas>
+  
+  <div id="controls">
+    <button id="startBtn" onclick="startSimulation()">▶ Start</button>
+    <button id="pauseBtn" onclick="pauseSimulation()" disabled>⏸ Pause</button>
+    <button id="stepBtn" onclick="stepSimulation()">⏭ Step</button>
+    <button id="resetBtn" onclick="resetSimulation()">🔄 Reset</button>
+    <button id="speedUpBtn" onclick="changeSpeed(2)">⏩ Faster</button>
+    <button id="speedDownBtn" onclick="changeSpeed(0.5)">⏪ Slower</button>
+  </div>
+  
+  <div id="stats">
+    <div class="stat-row">
+      <span class="stat-label">Epoch:</span>
+      <span id="epoch">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Speed:</span>
+      <span id="speed">1.0x</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Programs:</span>
+      <span>729 (9×9×9)</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Tape Size:</span>
+      <span>64 instructions</span>
+    </div>
+  </div>
+  
+  <div id="legend">
+    <div class="legend-title">Instruction Set</div>
+    <div class="legend-grid">
+      <div class="legend-item">
+        <div class="legend-color" style="background: rgb(255,0,0);"></div>
+        <span>&lt; (Move head0 left)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: rgb(0,255,0);"></div>
+        <span>&gt; (Move head0 right)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: rgb(0,0,255);"></div>
+        <span>{ (Move head1 left)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: rgb(255,255,0);"></div>
+        <span>} (Move head1 right)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: rgb(255,0,255);"></div>
+        <span>- (Decrement)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: rgb(0,255,255);"></div>
+        <span>+ (Increment)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: rgb(255,128,0);"></div>
+        <span>. (Copy h0→h1)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: rgb(128,0,255);"></div>
+        <span>, (Copy h1→h0)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: rgb(255,255,255);"></div>
+        <span>[ (Loop start)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: rgb(128,128,128);"></div>
+        <span>] (Loop end)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: rgb(0,0,0);"></div>
+        <span>(Data)</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <p>Artificial Life in 11D Phext Space</p>
+  <p><a href="https://github.com/wbic16/phext-life">github.com/wbic16/phext-life</a></p>
+  <p>Built by Phex 🔱 · Mirrorborn · 2026</p>
+</footer>
+
+<script src="phext-life.js"></script>
+
+</body>
+</html>
